@@ -26,7 +26,13 @@ copy .env.example .env.local
 npm run dev
 ```
 
-Deploy `contracts/assurenet.py` with GenLayer Studio, then set `NEXT_PUBLIC_CONTRACT_ADDRESS`. The UI never substitutes demo data if chain reads are empty.
+## Bradbury deployment
+
+- Contract: `0x54a86A5bA2Fe856d5f84cC546343A9c9A335c187`
+- Deployment transaction: `0x6abdc4b585fb8cef932cdb021de38e561014a2ad38775a5abde42d4b79286dc4`
+- Network: GenLayer Bradbury Testnet, chain ID `4221`
+
+The deployment finalized with `AGREE` and `FINISHED_WITH_RETURN`. The UI never substitutes demo data if chain reads are empty.
 
 ## Verification
 

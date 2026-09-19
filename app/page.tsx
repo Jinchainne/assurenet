@@ -67,6 +67,6 @@ export default function Home() {
     </article></div>}
 
     {(phase || error) && <aside role="status" aria-live="polite" className={`tx ${phase === "ERROR" || error ? "bad" : ""}`}><b>{error || (phase && phaseLabel[phase])}</b>{hash && <a href={`${EXPLORER}/transactions/${hash}`} target="_blank" rel="noreferrer">View transaction ↗</a>}<button aria-label="Dismiss transaction status" onClick={() => { setPhase(null); setError(""); }}>×</button></aside>}
-    <footer className="site-footer"><span>ASSURENET / STUDIO NETWORK 61999</span><span>Contract is the source of truth.</span></footer>
+    <footer className="site-footer"><span>ASSURENET / BRADBURY TESTNET 4221</span><span>Contract is the source of truth.</span></footer>
   </main>;
 }
