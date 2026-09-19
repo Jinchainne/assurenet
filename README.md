@@ -28,11 +28,13 @@ npm run dev
 
 ## Bradbury deployment
 
-- Contract: `0x54a86A5bA2Fe856d5f84cC546343A9c9A335c187`
-- Deployment transaction: `0x6abdc4b585fb8cef932cdb021de38e561014a2ad38775a5abde42d4b79286dc4`
+- Contract: `0xF90cd74CE935fE54b8a7f0Db9B2051ab83d369ce`
+- Deployment transaction: `0x6f1fd0ec883793713f82b3b17af47a45b538a6d91c830e3ff17babc17f73036a`
 - Network: GenLayer Bradbury Testnet, chain ID `4221`
 
 The deployment finalized with `AGREE` and `FINISHED_WITH_RETURN`. The UI never substitutes demo data if chain reads are empty.
+
+Historical deployments `0x54a86A5bA2Fe856d5f84cC546343A9c9A335c187` and `0x7dF88F702b5DD446Ad79cba78142c2211804c641` must not be used. They were replaced before any jobs were created while payout and policy-snapshot hardening was completed.
 
 ## Verification
 

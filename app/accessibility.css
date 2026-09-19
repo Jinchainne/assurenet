@@ -21,6 +21,14 @@
   animation: consensus-breathe 4s ease-in-out infinite;
 }
 
+.role-note {
+  padding: 12px 14px;
+  border-left: 3px solid var(--green);
+  background: #fff;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 @keyframes consensus-breathe {
   0%, 100% { background-position: 50% 42%, 50% 42%, 0 0; }
   50% { background-position: 52% 40%, 52% 40%, 0 0; }

@@ -21,3 +21,15 @@ def test_sources_are_explicitly_untrusted_and_bounded():
 def test_exactly_once_dispatch_guards():
     assert 'job["payout_dispatched"] or job["refund_dispatched"]' in SOURCE
     assert 'on="finalized"' in SOURCE
+    assert "@gl.evm.contract_interface" in SOURCE
+    assert "Recipient(Address(job" in SOURCE
+    assert "gl.message.emit_transfer" not in SOURCE
+
+def test_web_bytes_are_decoded_before_consensus():
+    assert 'isinstance(raw_body, bytes)' in SOURCE
+    assert 'decode("utf-8", errors="ignore")' in SOURCE
+
+def test_appeal_reuses_the_accepted_policy_snapshot():
+    assert 'frozen_policy = job.get("policy_snapshot", "")' in SOURCE
+    assert 'if frozen_policy else self._fetch(job["policy_url"])' in SOURCE
+    assert '"policy_snapshot": policy["body"]' in SOURCE
