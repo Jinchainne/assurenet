@@ -1,0 +1,73 @@
+"use client";
+
+import { createClient } from "genlayer-js";
+import { studionet } from "genlayer-js/chains";
+import type { Job, ContractSummary } from "./types";
+
+export const CHAIN_ID = "0xF22F";
+export const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "") as `0x${string}`;
+export const EXPLORER = "https://explorer-studio.genlayer.com";
+type Provider = { request(args: { method: string; params?: unknown[] }): Promise<unknown> };
+export type TxPhase = "SIGN" | "SUBMITTED" | "CONSENSUS" | "FINALIZED" | "READBACK" | "SUCCESS" | "ERROR";
+
+function provider(): Provider {
+  const value = (window as typeof window & { ethereum?: Provider }).ethereum;
+  if (!value) throw new Error("An EIP-1193 wallet is required");
+  return value;
+}
+
+export async function connectWallet(): Promise<string> {
+  const wallet = provider();
+  const accounts = await wallet.request({ method: "eth_requestAccounts" }) as string[];
+  try { await wallet.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_ID }] }); }
+  catch (error: unknown) {
+    if ((error as { code?: number }).code !== 4902) throw error;
+    await wallet.request({ method: "wallet_addEthereumChain", params: [{ chainId: CHAIN_ID, chainName: "GenLayer StudioNet", nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 }, rpcUrls: ["https://studio.genlayer.com/api"], blockExplorerUrls: [EXPLORER] }] });
+  }
+  if (!accounts[0]) throw new Error("Wallet returned no account");
+  return accounts[0];
+}
+
+function requireAddress() {
+  if (!/^0x[0-9a-fA-F]{40}$/.test(CONTRACT_ADDRESS) || /^0x0{40}$/.test(CONTRACT_ADDRESS)) throw new Error("Set NEXT_PUBLIC_CONTRACT_ADDRESS");
+  return CONTRACT_ADDRESS;
+}
+
+const readClient = createClient({ chain: studionet });
+async function read<T>(functionName: string, args: unknown[] = []): Promise<T> {
+  return readClient.readContract({ address: requireAddress(), functionName, args: args as never[] }) as Promise<T>;
+}
+export const getJob = (id: number) => read<Job>("get_job", [id]);
+export const getJobs = () => read<Job[]>("list_jobs");
+export const getSummary = () => read<ContractSummary>("get_summary");
+
+// A semantic verdict is executable only when it is bound to the fetched policy.
+export function policyBoundToExecution(job: Job): boolean {
+  return /^[0-9a-f]{64}$/.test(job.policy_digest) &&
+    ["RELEASE", "PARTIAL", "REFUND", "INSUFFICIENT"].includes(job.verdict) &&
+    job.release_bps >= 0 && job.release_bps <= 10000;
+}
+
+async function canonicalWait<T>(readback: () => Promise<T>, matches: (value: T) => boolean) {
+  for (let attempt = 0; attempt < 45; attempt++) {
+    try { const value = await readback(); if (matches(value)) return value; } catch { /* eventual RPC consistency */ }
+    await new Promise(resolve => setTimeout(resolve, Math.min(1000 + attempt * 250, 4000)));
+  }
+  throw new Error("Finalized transaction was not reflected in canonical state");
+}
+
+export async function writeAndVerify<T>(account: string, functionName: string, args: unknown[], readback: () => Promise<T>, matches: (value: T) => boolean, setPhase: (phase: TxPhase, hash?: string) => void, value = 0n) {
+  try {
+    const wallet = provider();
+    const client = createClient({ chain: studionet, account: account as `0x${string}`, provider: wallet });
+    setPhase("SIGN");
+    const hash = await client.writeContract({ address: requireAddress(), functionName, args: args as never[], value });
+    setPhase("SUBMITTED", hash); setPhase("CONSENSUS", hash);
+    const receipt = await client.waitForTransactionReceipt({ hash, status: "FINALIZED", retries: 220, interval: 4000 } as never);
+    const execution = JSON.stringify(receipt).toUpperCase();
+    if (execution.includes("FINISHED_WITH_ERROR")) throw new Error("GenVM execution reverted");
+    setPhase("FINALIZED", hash); setPhase("READBACK", hash);
+    const state = await canonicalWait(readback, matches);
+    setPhase("SUCCESS", hash); return { hash, state };
+  } catch (error) { setPhase("ERROR"); throw error; }
+}

@@ -1,0 +1,36 @@
+:root {
+  --muted: #4d5b53;
+}
+
+:focus-visible {
+  outline: 3px solid #6ca52d;
+  outline-offset: 3px;
+}
+
+.wallet,
+.primary,
+.secondary,
+.text-button,
+.job,
+.close {
+  min-height: 44px;
+  transition: transform 220ms ease, background-color 220ms ease, border-color 220ms ease;
+}
+
+.scan {
+  animation: consensus-breathe 4s ease-in-out infinite;
+}
+
+@keyframes consensus-breathe {
+  0%, 100% { background-position: 50% 42%, 50% 42%, 0 0; }
+  50% { background-position: 52% 40%, 52% 40%, 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
