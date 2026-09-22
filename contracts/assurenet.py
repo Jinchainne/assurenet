@@ -51,6 +51,9 @@ class AssureNet(gl.Contract):
             raise gl.vm.UserError("bounded title and brief required")
         if not policy_url.startswith("https://") or len(policy_url) > 500:
             raise gl.vm.UserError("https policy URL required")
+        policy = self._fetch(policy_url)
+        if not policy["ok"]:
+            raise gl.vm.UserError("policy could not be pinned")
         job_id = self.next_job_id
         self.next_job_id += u256(1)
         self.total_locked += amount
@@ -58,7 +61,7 @@ class AssureNet(gl.Contract):
             "id": int(job_id), "client": str(gl.message.sender_address), "worker": str(worker),
             "title": title.strip(), "brief": brief.strip(), "policy_url": policy_url,
             "evidence_url": "", "amount": str(amount), "status": "OPEN",
-            "policy_digest": "", "policy_excerpt": "", "policy_snapshot": "", "verdict": "", "release_bps": 0,
+            "policy_digest": policy["digest"], "policy_excerpt": policy["body"][:480], "policy_snapshot": policy["body"], "evidence_digest": "", "verdict": "", "release_bps": 0,
             "confidence": 0, "reason": "", "reviewed_at": 0, "challenge_reason": "",
             "payout_dispatched": False, "refund_dispatched": False
         })
@@ -113,7 +116,7 @@ Reason must be under 240 characters.\n""" + \
         if not valid:
             verdict, bps, confidence, reason = "INSUFFICIENT", 0, 0, "Validator output failed schema checks"
         return {"verdict": verdict, "release_bps": bps, "confidence": confidence, "reason": reason,
-                "policy_digest": policy["digest"], "policy_excerpt": policy["body"][:480], "policy_snapshot": policy["body"]}
+                "policy_digest": policy["digest"], "policy_excerpt": policy["body"][:480], "policy_snapshot": policy["body"], "evidence_digest": evidence["digest"]}
 
     def _consensus(self, job: dict, appeal: str) -> dict:
         def leader():
@@ -123,7 +126,11 @@ Reason must be under 240 characters.\n""" + \
                 return False
             mine = self._decide(job, appeal)
             theirs = candidate.calldata
-            return all(mine.get(key) == theirs.get(key) for key in ("verdict", "release_bps")) and theirs.get("policy_digest") == mine.get("policy_digest")
+            if theirs.get("verdict") != mine.get("verdict") or theirs.get("policy_digest") != mine.get("policy_digest") or theirs.get("evidence_digest") != mine.get("evidence_digest"):
+                return False
+            if mine.get("verdict") == "PARTIAL":
+                return abs(int(theirs.get("release_bps", 0)) - int(mine.get("release_bps", 0))) <= 100
+            return theirs.get("release_bps") == mine.get("release_bps")
         return gl.vm.run_nondet_unsafe(leader, validator)
 
     @gl.public.write

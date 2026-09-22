@@ -7,6 +7,7 @@ import type { Job, ContractSummary } from "./types";
 export const CHAIN_ID = "0x107D";
 export const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "") as `0x${string}`;
 export const EXPLORER = "https://explorer-bradbury.genlayer.com";
+const bradburyRpc = { ...testnetBradbury, rpcUrls: { ...testnetBradbury.rpcUrls, default: { ...testnetBradbury.rpcUrls.default, http: ["/api/genlayer-rpc"] } } };
 type Provider = { request(args: { method: string; params?: unknown[] }): Promise<unknown> };
 export type TxPhase = "SIGN" | "SUBMITTED" | "CONSENSUS" | "FINALIZED" | "READBACK" | "SUCCESS" | "ERROR";
 
@@ -33,7 +34,7 @@ function requireAddress() {
   return CONTRACT_ADDRESS;
 }
 
-const readClient = createClient({ chain: testnetBradbury });
+const readClient = createClient({ chain: bradburyRpc });
 async function read<T>(functionName: string, args: unknown[] = []): Promise<T> {
   return readClient.readContract({ address: requireAddress(), functionName, args: args as never[] }) as Promise<T>;
 }
@@ -84,7 +85,7 @@ async function canonicalWait<T>(readback: () => Promise<T>, matches: (value: T) 
 export async function writeAndVerify<T>(account: string, functionName: string, args: unknown[], readback: () => Promise<T>, matches: (value: T) => boolean, setPhase: (phase: TxPhase, hash?: string) => void, value = 0n) {
   try {
     const wallet = provider();
-    const client = createClient({ chain: testnetBradbury, account: account as `0x${string}`, provider: wallet });
+    const client = createClient({ chain: bradburyRpc, account: account as `0x${string}`, provider: wallet });
     setPhase("SIGN");
     const hash = await client.writeContract({ address: requireAddress(), functionName, args: args as never[], value });
     setPhase("SUBMITTED", hash); setPhase("CONSENSUS", hash);
