@@ -7,6 +7,7 @@ import type { Job, ContractSummary } from "./types";
 export const CHAIN_ID = "0x107D";
 export const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "") as `0x${string}`;
 export const EXPLORER = "https://explorer-bradbury.genlayer.com";
+function walletRpcUrl() { return typeof window === "undefined" ? "https://assurenet-chi.vercel.app/api/genlayer-rpc" : `${window.location.origin}/api/genlayer-rpc`; }
 const bradburyRpc = { ...testnetBradbury, rpcUrls: { ...testnetBradbury.rpcUrls, default: { ...testnetBradbury.rpcUrls.default, http: ["/api/genlayer-rpc"] } } };
 type Provider = { request(args: { method: string; params?: unknown[] }): Promise<unknown> };
 export type TxPhase = "SIGN" | "SUBMITTED" | "CONSENSUS" | "FINALIZED" | "READBACK" | "SUCCESS" | "ERROR";
@@ -23,7 +24,7 @@ export async function connectWallet(): Promise<string> {
   try { await wallet.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_ID }] }); }
   catch (error: unknown) {
     if ((error as { code?: number }).code !== 4902) throw error;
-    await wallet.request({ method: "wallet_addEthereumChain", params: [{ chainId: CHAIN_ID, chainName: "GenLayer Bradbury Testnet", nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 }, rpcUrls: ["https://rpc-bradbury.genlayer.com"], blockExplorerUrls: [EXPLORER] }] });
+    await wallet.request({ method: "wallet_addEthereumChain", params: [{ chainId: CHAIN_ID, chainName: "GenLayer Bradbury Testnet", nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 }, rpcUrls: [walletRpcUrl()], blockExplorerUrls: [EXPLORER] }] });
   }
   if (!accounts[0]) throw new Error("Wallet returned no account");
   return accounts[0];

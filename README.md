@@ -64,6 +64,10 @@ npm run dev
 
 Set `NEXT_PUBLIC_CONTRACT_ADDRESS` to the production contract above, or to a contract you deploy yourself. Never commit `.env.local` or wallet secrets.
 
+### Wallet RPC migration
+
+The browser registers Bradbury with `https://assurenet-chi.vercel.app/api/genlayer-rpc`. If MetaMask already has chain `4221` saved with the direct Bradbury RPC, remove that network and reconnect so it is re-added with the proxy. This matters for signed `eth_sendRawTransaction` writes; reads can succeed even when an old wallet entry still bypasses the proxy.
+
 ## Verification
 
 ```bash
