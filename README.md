@@ -1,40 +1,68 @@
 # AssureNet
 
-Consensus-backed delivery escrow for work that cannot be verified by a deterministic `if` statement.
+### Consensus-backed escrow for work that cannot be reduced to a boolean check.
 
-A client funds a job and binds it to a public acceptance policy. The worker submits public delivery evidence. GenLayer validators independently retrieve both sources, treat their contents as untrusted data, and agree on a structured release percentage. Either party gets one bounded appeal; after the challenge window the accepted percentage drives the real payout and refund.
+AssureNet turns a delivery agreement into an on-chain, policy-bound escrow. A client locks GEN, a worker submits public evidence, and GenLayer validators independently evaluate whether that evidence satisfies the agreed policy. The resulting verdict and release percentage are stored by the contract and settle the escrow — no private backend, operator decision, or fabricated frontend state.
 
-## Why GenLayer is essential
+[Live application](https://assurenet-chi.vercel.app) · [GitHub](https://github.com/Jinchainne/assurenet) · [Bradbury contract](https://explorer-bradbury.genlayer.com/address/0x57697Ed2681372CFa745c530dfEA56d4EAbeE873)
 
-The outcome depends on semantic interpretation of live policy and evidence. `contracts/assurenet.py` uses `gl.nondet.web.get`, `gl.nondet.exec_prompt`, and `gl.vm.run_nondet_unsafe`. Validators reproduce the review and compare verdict, release basis points, and policy digest. That result directly controls escrow settlement.
+## What makes it a GenLayer application
 
-The app is not a static contract panel: its browser client creates funded jobs, submits evidence, triggers review, challenges decisions, waits for finality, checks execution failure, and requires canonical readback before reporting success.
+The hard part is semantic: “does this delivery satisfy the brief under this policy?” AssureNet uses GenLayer’s non-deterministic execution for that decision:
 
-## Product flow
+- `gl.nondet.web.get` retrieves bounded policy and delivery sources.
+- `gl.nondet.exec_prompt` produces a structured verdict: `RELEASE`, `PARTIAL`, `REFUND`, or `INSUFFICIENT`.
+- `gl.vm.run_nondet_unsafe` requires independent validator reproduction.
+- Consensus binds the result to both a frozen `policy_digest` and the fetched `evidence_digest`.
+- `release_bps` directly controls the worker payout and client refund.
 
-1. Client creates and funds a policy-bound job.
-2. Worker submits an HTTPS evidence source.
-3. Validators issue `RELEASE`, `PARTIAL`, `REFUND`, or `INSUFFICIENT`.
-4. Client or worker may use one 24-hour appeal.
-5. Finalization closes state before emitting exactly-once worker/refund transfers.
+The browser signs real transactions through an EIP-1193 wallet, waits for finalized execution, rejects failed GenVM results, and performs canonical contract readback before showing success.
 
-## Local setup
+## Escrow lifecycle
+
+```text
+CLIENT FUNDS
+    │ policy is fetched, hashed, and snapshotted at funding
+    ▼
+WORKER SUBMITS EVIDENCE
+    │ public HTTPS source, worker-only authorization
+    ▼
+VALIDATOR REVIEW
+    │ policy + evidence fetched independently; consensus checks both digests
+    ▼
+OPTIONAL CHALLENGE
+    │ client or worker, once, inside the 24-hour window
+    ▼
+FINALIZE
+    │ state closes first; bounded payout/refund transfers execute exactly once
+```
+
+`PARTIAL` outcomes tolerate a small validator rounding difference (100 basis points) while still requiring agreement on the verdict, policy digest, and evidence digest.
+
+## Production deployment
+
+| Resource | Value |
+| --- | --- |
+| Network | GenLayer Bradbury Testnet |
+| Chain ID | `4221` (`0x107D`) |
+| Contract | [`0x57697Ed2681372CFa745c530dfEA56d4EAbeE873`](https://explorer-bradbury.genlayer.com/address/0x57697Ed2681372CFa745c530dfEA56d4EAbeE873) |
+| Deployment transaction | [`0x08ca7963...`](https://explorer-bradbury.genlayer.com/transactions/0x08ca7963e584e3d783f53914e73588278d23047ccc3ef1d0d9c4d6396f1255ae) |
+| Web app | [assurenet-chi.vercel.app](https://assurenet-chi.vercel.app) |
+
+The app includes `/api/genlayer-rpc`, a same-origin Bradbury proxy that normalizes viem JSON-RPC request IDs for the Bradbury node. This addresses the production `eth_sendRawTransaction` incompatibility observed with the bundled client.
+
+## Run locally
+
+Requirements: Node.js 20+, npm, Python 3.11+, a GenLayer-compatible wallet, and Bradbury test GEN for writes.
 
 ```bash
 npm ci
-copy .env.example .env.local
+copy .env.example .env.local       # PowerShell / Windows
+# cp .env.example .env.local       # macOS / Linux
 npm run dev
 ```
 
-## Bradbury deployment
-
-- Contract: `0xF90cd74CE935fE54b8a7f0Db9B2051ab83d369ce`
-- Deployment transaction: `0x6f1fd0ec883793713f82b3b17af47a45b538a6d91c830e3ff17babc17f73036a`
-- Network: GenLayer Bradbury Testnet, chain ID `4221`
-
-The deployment finalized with `AGREE` and `FINISHED_WITH_RETURN`. The UI never substitutes demo data if chain reads are empty.
-
-Historical deployments `0x54a86A5bA2Fe856d5f84cC546343A9c9A335c187` and `0x7dF88F702b5DD446Ad79cba78142c2211804c641` must not be used. They were replaced before any jobs were created while payout and policy-snapshot hardening was completed.
+Set `NEXT_PUBLIC_CONTRACT_ADDRESS` to the production contract above, or to a contract you deploy yourself. Never commit `.env.local` or wallet secrets.
 
 ## Verification
 
@@ -47,11 +75,29 @@ python -m pytest -q
 genvm-lint check contracts/assurenet.py
 ```
 
-See [DESIGN.md](DESIGN.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+The Python suite includes behavior tests for worker/client authorization, challenge timing, exactly-once finalization, and partial payout/refund conservation. The contract linter validates the GenLayer ABI and execution model.
 
-## Design provenance
+## Security and trust boundaries
 
-The interface is original. Its workflow was informed by the MIT-licensed DESIGN.md format in `VoltAgent/awesome-design-md`, accessibility and responsive heuristics in `nextlevelbuilder/ui-ux-pro-max-skill`, and Theatre.js choreography principles. No third-party product UI or source code is copied.
+- Policy and evidence are treated as untrusted text; prompts embedded in sources are not instructions.
+- Sources are HTTPS-only and bounded before entering the validator prompt.
+- Policy content is pinned when funds are locked, not when review begins.
+- State is marked finalized before external transfers, preventing retry-based double settlement.
+- The contract never claims a successful write until finality, execution status, and canonical readback all agree.
+
+The public testnet deployment is not production custody. Use test GEN only, verify URLs before funding, and review the contract source before relying on it.
+
+## Repository map
+
+```text
+contracts/assurenet.py       GenLayer escrow contract
+lib/genlayer.ts              wallet, RPC, finality, and canonical readback client
+app/api/genlayer-rpc/        Bradbury JSON-RPC compatibility proxy
+app/                         Next.js application and interaction UI
+tests/                       client and contract behavior tests
+docs/ARCHITECTURE.md         state and trust-boundary notes
+DESIGN.md                    visual and interaction principles
+```
 
 ## License
 
