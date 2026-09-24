@@ -21,10 +21,16 @@ function provider(): Provider {
 export async function connectWallet(): Promise<string> {
   const wallet = provider();
   const accounts = await wallet.request({ method: "eth_requestAccounts" }) as string[];
+  const chain = { chainId: CHAIN_ID, chainName: "GenLayer Bradbury Testnet", nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 }, rpcUrls: [walletRpcUrl()], blockExplorerUrls: [EXPLORER] };
+  try { await wallet.request({ method: "wallet_addEthereumChain", params: [chain] }); } catch (error: unknown) {
+    const code = (error as { code?: number }).code;
+    if (code !== -32602 && code !== -4001) throw error;
+  }
   try { await wallet.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_ID }] }); }
   catch (error: unknown) {
     if ((error as { code?: number }).code !== 4902) throw error;
-    await wallet.request({ method: "wallet_addEthereumChain", params: [{ chainId: CHAIN_ID, chainName: "GenLayer Bradbury Testnet", nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 }, rpcUrls: [walletRpcUrl()], blockExplorerUrls: [EXPLORER] }] });
+    await wallet.request({ method: "wallet_addEthereumChain", params: [chain] });
+    await wallet.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_ID }] });
   }
   if (!accounts[0]) throw new Error("Wallet returned no account");
   return accounts[0];
